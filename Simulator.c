@@ -10,13 +10,13 @@
 #define INC 4
 #define DEBUG 1
 
-// tinker file header (matches assembler definition)
+// tinker file header
 typedef struct {
-    uint32_t file_type;       // Currently 0
-    uint32_t code_seg_begin;  // Address to load code segment
-    uint32_t code_seg_size;   // Size of code segment in bytes
-    uint32_t data_seg_begin;  // Address to load data segment
-    uint32_t data_seg_size;   // Size of data segment in bytes
+    uint64_t file_type; 
+    uint64_t code_seg_begin;  // code segment
+    uint64_t code_seg_size; 
+    uint64_t data_seg_begin;  // data segment
+    uint64_t data_seg_size;
 } TinkerFileHeader;
 
 static uint64_t pc;
@@ -200,12 +200,14 @@ void execPriv(uint32_t i) {
     case 0x0: // halt
         exit(0);
 
-    case 0x3: {
+    case 0x3: { // input
         uint32_t rd = getrd(i);
         uint32_t rs = getrs(i);
         uint64_t p = regs[rs];
 
-        if (p == 0) {
+        if (p == 0 || p == 2) {
+            // port 0 and port 2: read unsigned integer from stdin
+            // raw bits interpreted as IEEE 754 double for floating-point ops
             char buf[256];
             if (!fgets(buf, sizeof(buf), stdin)) {
                 fprintf(stderr, "Simulation error\n");
@@ -236,6 +238,9 @@ void execPriv(uint32_t i) {
             }
 
             regs[rd] = val;
+        } else {
+            fprintf(stderr, "Simulation error\n");
+            exit(1);
         }
 
         pc += INC;
@@ -246,8 +251,14 @@ void execPriv(uint32_t i) {
         uint32_t rd = getrd(i);
         uint32_t rs = getrs(i);
         uint64_t p = regs[rd];
-        if (p == 1) {
+        if (p == 1 || p == 2) {
+            // port 1 and port 2: print unsigned integer
+            // For port 2, these are IEEE 754 double bits printed as uint64
             printf("%lu\n", (long unsigned int)regs[rs]);
+        } else if (p == 3) {
+            // port 3: print single ASCII character
+            uint64_t ch = regs[rs];
+            putchar((int)(ch & 0xFF));
         }
         pc = pc + INC;
         return;
@@ -437,7 +448,7 @@ int procFile(const char *file) {
     if (!f)
         return 1;
 
-    // Read the header
+    // read the header
     TinkerFileHeader header;
     if (fread(&header, sizeof(TinkerFileHeader), 1, f) != 1) {
         fprintf(stderr, "Invalid tinker file: could not read header\n");
@@ -445,28 +456,29 @@ int procFile(const char *file) {
         return 1;
     }
 
-    // Validate file type
+    // validate file type
     if (header.file_type != 0) {
-        fprintf(stderr, "Invalid tinker file: unknown file type %u\n", header.file_type);
+        fprintf(stderr, "Invalid tinker file: unknown file type %llu\n", 
+                (unsigned long long)header.file_type);
         fclose(f);
         return 1;
     }
 
-    // Validate that segments fit within memory
-    if ((uint64_t)header.code_seg_begin + header.code_seg_size > MEM_SIZE) {
+    // validate that segments fit within memory
+    if (header.code_seg_begin + header.code_seg_size > MEM_SIZE) {
         fprintf(stderr, "Invalid tinker file: code segment exceeds memory bounds\n");
         fclose(f);
         return 1;
     }
 
     if (header.data_seg_size > 0 &&
-        (uint64_t)header.data_seg_begin + header.data_seg_size > MEM_SIZE) {
+        header.data_seg_begin + header.data_seg_size > MEM_SIZE) {
         fprintf(stderr, "Invalid tinker file: data segment exceeds memory bounds\n");
         fclose(f);
         return 1;
     }
 
-    // Load code segment into memory at code_seg_begin
+    // load code segment into memory at code_seg_begin
     if (header.code_seg_size > 0) {
         if (fread(&mem[header.code_seg_begin], 1, header.code_seg_size, f)
                 != header.code_seg_size) {
@@ -476,7 +488,7 @@ int procFile(const char *file) {
         }
     }
 
-    // Load data segment into memory at data_seg_begin
+    // load data segment into memory at data_seg_begin
     if (header.data_seg_size > 0) {
         if (fread(&mem[header.data_seg_begin], 1, header.data_seg_size, f)
                 != header.data_seg_size) {
@@ -486,7 +498,7 @@ int procFile(const char *file) {
         }
     }
 
-    // Set PC to beginning of code segment
+    // set PC to beginning of code segment
     pc = header.code_seg_begin;
 
     fclose(f);

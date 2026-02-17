@@ -734,7 +734,7 @@ void writeBinary(const char *filename)
             codeSize += 4;
     }
 
-    // write 40-byte header (5 × uint64_t)
+    // write 40-byte header
     TinkerFileHeader header;
     header.file_type      = 0;
     header.code_seg_begin = CODE_START_ADDR;
@@ -744,7 +744,7 @@ void writeBinary(const char *filename)
 
     fwrite(&header, sizeof(TinkerFileHeader), 1, f);
 
-    // write code segment  (no padding gap between code and data)
+    // write code segment
     for (int i = 0; i < numInstructions; i++)
     {
         if (instructions[i].op[0] == '.' || instructions[i].isCode != 1)
@@ -954,7 +954,7 @@ void validateFile(const char *filename)
             {
                 //  code section 
 
-                // pre-tokenisation: check parentheses balance and ordering
+                // check parentheses balance and ordering
                 {
                     int openCount   = 0;
                     int closeCount  = 0;
@@ -1014,7 +1014,7 @@ void validateFile(const char *filename)
                     }
                 }
 
-                // tokenization
+                // tokenize
                 char buffer[MAX_LINE];
                 strcpy(buffer, content);
 
@@ -1295,6 +1295,8 @@ void validateFile(const char *filename)
                         fprintf(stderr, "error: instruction 'mov' expects at least 2 args\n");
                         hasError = 1;
                     }
+                    // parentheses consistency already checked above;
+                    // nothing more needed at this stage
                 }
                 else
                 {
@@ -1310,7 +1312,7 @@ void validateFile(const char *filename)
             }
             else if (currentMode == 0)
             {
-                // data section
+                //  data section 
                 if (isNegative(content))
                 {
                     fprintf(stderr, "error line %d: data values must be unsigned\n", lineNum);
@@ -1321,7 +1323,7 @@ void validateFile(const char *filename)
 
                 errno = 0;
                 char *end;
-                strtoull(content, &end, 0);
+                /*unsigned long long val =*/ strtoull(content, &end, 0);
 
                 while (*end == ' ' || *end == '\t')
                     end++;
@@ -1370,7 +1372,7 @@ void validateFile(const char *filename)
     fclose(f);
 }
 
-// main
+//  entry point 
 
 int main(int argc, char *argv[])
 {

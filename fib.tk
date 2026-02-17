@@ -1,0 +1,8 @@
+.code
+    ld r11, 0
+    in r1, r11
+    ld r10, 1
+    ld r2, 0
+    ld r3, 1
+    ld r4, 1
+    ld r5, 2

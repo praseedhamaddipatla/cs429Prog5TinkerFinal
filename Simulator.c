@@ -12,11 +12,11 @@
 
 // tinker file header
 typedef struct {
-    uint64_t file_type; 
+    uint64_t file_type;   
     uint64_t code_seg_begin;  // code segment
-    uint64_t code_seg_size; 
+    uint64_t code_seg_size;  
     uint64_t data_seg_begin;  // data segment
-    uint64_t data_seg_size;
+    uint64_t data_seg_size; 
 } TinkerFileHeader;
 
 static uint64_t pc;
@@ -207,7 +207,7 @@ void execPriv(uint32_t i) {
 
         if (p == 0 || p == 2) {
             // port 0 and port 2: read unsigned integer from stdin
-            // raw bits interpreted as IEEE 754 double for floating-point ops
+            // The raw bits can be interpreted as IEEE 754 double for floating-point ops
             char buf[256];
             if (!fgets(buf, sizeof(buf), stdin)) {
                 fprintf(stderr, "Simulation error\n");
@@ -456,7 +456,7 @@ int procFile(const char *file) {
         return 1;
     }
 
-    // validate file type
+    // vlidate file type
     if (header.file_type != 0) {
         fprintf(stderr, "Invalid tinker file: unknown file type %llu\n", 
                 (unsigned long long)header.file_type);

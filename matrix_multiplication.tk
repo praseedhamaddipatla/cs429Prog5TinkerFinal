@@ -54,7 +54,7 @@
 ; middle loop over columns of result matrix
 :midloop
 	clr r6
-	clr r14
+	ld r14, 0
 
 ; inner loop computes dot product of row i and column j
 :innerloop

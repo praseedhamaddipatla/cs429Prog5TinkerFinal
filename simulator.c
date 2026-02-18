@@ -73,7 +73,7 @@ void store64(uint64_t addr, uint64_t val) {
 // fetch
 uint32_t fetchInstr(void) {
     if (pc + 3 >= MEM_SIZE) {
-        fprintf(stderr, "Simulation error \n", pc);
+        fprintf(stderr, "Simulation error \n");
         exit(1);
     }
 
@@ -621,8 +621,7 @@ int procFile(const char *file) {
 
     // validate file type
     if (header.file_type != 0) {
-        fprintf(stderr, "Simulation error\n",
-                (unsigned long long)header.file_type);
+        fprintf(stderr, "Simulation error\n");
         fclose(f);
         return 1;
     }

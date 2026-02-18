@@ -12,7 +12,6 @@
 
 #define DEBUG 0
 
-
 // segment base addresses
 #define CODE_START_ADDR 0x2000
 #define DATA_START_ADDR 0x10000
@@ -126,38 +125,7 @@ void firstPass(const char *filename) {
             continue;
 
         if (buffer[0] == ':') {
-            int i = 1;
-
-            if (buffer[i] == '\0' || buffer[i] == '\n') {
-                fprintf(stderr, "error: empty label\n");
-                cleanupAndExit();
-            }
-            if (buffer[i] == ' ' || buffer[i] == '\t') {
-                fprintf(stderr, "error: invalid label\n");
-                cleanupAndExit();
-            }
-            if (!isalpha((unsigned char)buffer[i]) && buffer[i] != '_') {
-                fprintf(stderr, "error: invalid label\n");
-                cleanupAndExit();
-            }
-
-            int start = i;
-            while (isalnum((unsigned char)buffer[i]) || buffer[i] == '_')
-                i++;
-
-            if (i == start) {
-                fprintf(stderr, "error: invalid label\n");
-                cleanupAndExit();
-            }
-
-            while (buffer[i] == ' ' || buffer[i] == '\t')
-                i++;
-
-            if (buffer[i] != '\0' && buffer[i] != '\n') {
-                fprintf(stderr, "error: invalid label\n");
-                cleanupAndExit();
-            }
-
+            // validation already done in validateFile
             int labelAddr = (mode == 1) ? codeAddress : dataAddress;
             addLabel(buffer, labelAddr);
             continue;
@@ -626,8 +594,7 @@ void encodeInstruction(Instruction inst, FILE *f) {
     }
 }
 
-void writeBinary(const char *filename)
-{
+void writeBinary(const char *filename) {
     FILE *f = fopen(filename, "wb");
     if (!f) {
         fprintf(stderr, "cant write binary\n");
@@ -637,8 +604,7 @@ void writeBinary(const char *filename)
     uint64_t codeSize = 0;
     uint64_t dataSize = 0;
 
-    for (int i = 0; i < numInstructions; i++)
-    {
+    for (int i = 0; i < numInstructions; i++) {
         if (instructions[i].op[0] == '.')
             continue;
 
@@ -650,17 +616,16 @@ void writeBinary(const char *filename)
 
     TinkerFileHeader header;
     header.file_type = 0;
-    header.code_seg_begin = CODE_START_ADDR;   // 0x2000
-    header.code_seg_size  = codeSize;
-    header.data_seg_begin = DATA_START_ADDR;   // 0x10000
-    header.data_seg_size  = dataSize;
+    header.code_seg_begin = CODE_START_ADDR; // 0x2000
+    header.code_seg_size = codeSize;
+    header.data_seg_begin = DATA_START_ADDR; // 0x10000
+    header.data_seg_size = dataSize;
 
     // Write header
     fwrite(&header, sizeof(header), 1, f);
 
     // Write code segment IMMEDIATELY after header (no padding!)
-    for (int i = 0; i < numInstructions; i++)
-    {
+    for (int i = 0; i < numInstructions; i++) {
         if (instructions[i].op[0] == '.')
             continue;
         if (instructions[i].isCode)
@@ -668,8 +633,7 @@ void writeBinary(const char *filename)
     }
 
     // Write data segment IMMEDIATELY after code (no padding!)
-    for (int i = 0; i < numInstructions; i++)
-    {
+    for (int i = 0; i < numInstructions; i++) {
         if (instructions[i].op[0] == '.')
             continue;
         if (!instructions[i].isCode)
@@ -785,22 +749,41 @@ void validateFile(const char *filename) {
         if (rawLine[0] == ':') {
             int i = 1;
 
-            int start = i;
-            while (!isspace(rawLine[i]))
-                i++;
-
-            if (i == start) {
-                fprintf(stderr, "error line %d: invalid label\n", lineNum);
+            // empty label
+            if (rawLine[i] == '\n' || rawLine[i] == '\0') {
+                fprintf(stderr, "error line %d: empty label\n", lineNum);
                 hasError = 1;
                 fclose(f);
                 return;
             }
 
+            // space/tab immediately after colon is invalid (": L1")
+            if (rawLine[i] == ' ' || rawLine[i] == '\t') {
+                fprintf(stderr,
+                        "error line %d: invalid label (space after colon)\n",
+                        lineNum);
+                hasError = 1;
+                fclose(f);
+                return;
+            }
+
+            // consume all non-whitespace characters
+            while (rawLine[i] != '\0' && rawLine[i] != '\n' &&
+                   rawLine[i] != ' ' && rawLine[i] != '\t') {
+                i++;
+            }
+
+            // skip trailing whitespace
             while (rawLine[i] == ' ' || rawLine[i] == '\t')
                 i++;
 
-            if (!isspace(rawLine[i])) {
-                fprintf(stderr, "error line %d: invalid label\n", lineNum);
+            // if there's still non-whitespace content, label has internal space
+            // (":L 1")
+            if (rawLine[i] != '\n' && rawLine[i] != '\0') {
+                fprintf(
+                    stderr,
+                    "error line %d: invalid label (content after whitespace)\n",
+                    lineNum);
                 hasError = 1;
                 fclose(f);
                 return;
@@ -1191,7 +1174,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    #if DEBUG
+#if DEBUG
     printf("Header size: %lu\n", sizeof(TinkerFileHeader));
 #endif
 

@@ -1,22 +1,22 @@
 #include <ctype.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
 #define MEM_SIZE (1 << 19)
 #define REG 32
 #define INC 4
-#define DEBUG 1
+#define DEBUG 0
 
 // tinker file header
 typedef struct {
-    uint64_t file_type;   
-    uint64_t code_seg_begin;  // code segment
-    uint64_t code_seg_size;  
-    uint64_t data_seg_begin;  // data segment
-    uint64_t data_seg_size; 
+    uint64_t file_type;
+    uint64_t code_seg_begin; // code segment
+    uint64_t code_seg_size;
+    uint64_t data_seg_begin; // data segment
+    uint64_t data_seg_size;
 } TinkerFileHeader;
 
 static uint64_t pc;
@@ -73,13 +73,19 @@ void store64(uint64_t addr, uint64_t val) {
 // fetch
 uint32_t fetchInstr(void) {
     if (pc + 3 >= MEM_SIZE) {
-        fprintf(stderr, "Simulation error\n");
+        fprintf(stderr, "FETCH ERROR: PC out of bounds: 0x%lx\n", pc);
         exit(1);
     }
 
-    //get instruction
     uint32_t instr = mem[pc] | (mem[pc + 1] << 8) | (mem[pc + 2] << 16) |
                      (mem[pc + 3] << 24);
+
+#if DEBUG
+    printf("\nFETCH\n");
+    printf(" PC = 0x%lx\n", pc);
+    printf(" INSTR = 0x%08x\n", instr);
+#endif
+
     return instr;
 }
 
@@ -173,7 +179,7 @@ void execMovReg(uint32_t i) {
 void execMovImm(uint32_t i) {
     // keep upper 52 bits, set lower 12 bits to L
     uint32_t rd = getrd(i);
-    uint64_t L = getImm(i);  // unsigned
+    uint64_t L = getImm(i); // unsigned
     regs[rd] = (regs[rd] & ~0xFFFULL) | L;
     NEXT;
 }
@@ -207,7 +213,8 @@ void execPriv(uint32_t i) {
 
         if (p == 0 || p == 2) {
             // port 0 and port 2: read unsigned integer from stdin
-            // The raw bits can be interpreted as IEEE 754 double for floating-point ops
+            // The raw bits can be interpreted as IEEE 754 double for
+            // floating-point ops
             char buf[256];
             if (!fgets(buf, sizeof(buf), stdin)) {
                 fprintf(stderr, "Simulation error\n");
@@ -311,7 +318,7 @@ void execDivf(uint32_t i) {
     pc += INC;
 }
 
-//branch
+// branch
 
 void execBr(uint32_t i) { pc = regs[getrd(i)]; }
 void execBrrReg(uint32_t i) { pc += regs[getrd(i)]; }
@@ -324,121 +331,265 @@ void execBrnz(uint32_t i) {
 }
 void execCall(uint32_t i) {
     uint64_t retAddr = pc + INC;
-    store64(regs[31] - 8, retAddr); //dont modify
+    store64(regs[31] - 8, retAddr); // dont modify
     pc = regs[getrd(i)];
 }
 void execReturn() {
-    uint64_t retAddr = load64(regs[31] - 8);  // dont modify r31
+    uint64_t retAddr = load64(regs[31] - 8); // dont modify r31
     pc = retAddr;
 }
 
 // main loop
 void runSim(void) {
+#if DEBUG
+    int step = 0;
+#endif
+
     while (running) {
-        uint32_t i = fetchInstr();
-        uint32_t op = getOpcode(i);
+
+#if DEBUG
+        printf("\n=============================\n");
+        printf("STEP %d\n", step++);
+        printf("=============================\n");
+#endif
+
+        uint32_t instr = fetchInstr();
+        uint32_t op = getOpcode(instr);
+
+#if DEBUG
+        printf(" opcode = 0x%x\n", op);
+        printf(" rd=%u rs=%u rt=%u imm=%d\n", getrd(instr), getrs(instr),
+               getrt(instr), getL(instr));
+#endif
 
         switch (op) {
+        // Logic operations
         case 0x00:
-            execAnd(i);
+#if DEBUG
+            printf(" EXEC AND\n");
+#endif
+            execAnd(instr);
             break;
+
         case 0x01:
-            execOr(i);
+#if DEBUG
+            printf(" EXEC OR\n");
+#endif
+            execOr(instr);
             break;
+
         case 0x02:
-            execXor(i);
+#if DEBUG
+            printf(" EXEC XOR\n");
+#endif
+            execXor(instr);
             break;
+
         case 0x03:
-            execNot(i);
+#if DEBUG
+            printf(" EXEC NOT\n");
+#endif
+            execNot(instr);
             break;
+
+        // Shifts
         case 0x04:
-            execShftr(i);
+#if DEBUG
+            printf(" EXEC SHFTR\n");
+#endif
+            execShftr(instr);
             break;
+
         case 0x05:
-            execShftri(i);
+#if DEBUG
+            printf(" EXEC SHFTRI\n");
+#endif
+            execShftri(instr);
             break;
+
         case 0x06:
-            execShftl(i);
+#if DEBUG
+            printf(" EXEC SHFTL\n");
+#endif
+            execShftl(instr);
             break;
+
         case 0x07:
-            execShftli(i);
+#if DEBUG
+            printf(" EXEC SHFTLI\n");
+#endif
+            execShftli(instr);
             break;
 
-        case 0x18:
-            execAdd(i);
-            break;
-        case 0x19:
-            execAddi(i);
-            break;
-        case 0x1A:
-            execSub(i);
-            break;
-        case 0x1B:
-            execSubi(i);
-            break;
-        case 0x1C:
-            execMul(i);
-            break;
-        case 0x1D:
-            execDiv(i);
-            break;
-
-        case 0x10:
-            execMovLoad(i);
-            break;
-        case 0x11:
-            execMovReg(i);
-            break;
-        case 0x12:
-            execMovImm(i);
-            break;
-        case 0x13:
-            execMovStore(i);
-            break;
-
-        case 0x0E:
-            execBrgt(i);
-            break;
-        case 0x0F:
-            execPriv(i);
-            break;
-
-        case 0x14:
-            execAddf(i);
-            break;
-        case 0x15:
-            execSubf(i);
-            break;
-        case 0x16:
-            execMulf(i);
-            break;
-        case 0x17:
-            execDivf(i);
-            break;
-
+        // Control flow
         case 0x08:
-            execBr(i);
+#if DEBUG
+            printf(" EXEC BR\n");
+#endif
+            execBr(instr);
             break;
+
         case 0x09:
-            execBrrReg(i);
+#if DEBUG
+            printf(" EXEC BRR (reg)\n");
+#endif
+            execBrrReg(instr);
             break;
+
         case 0x0A:
-            execBrrImm(i);
+#if DEBUG
+            printf(" EXEC BRR (imm)\n");
+#endif
+            execBrrImm(instr);
             break;
+
         case 0x0B:
-            execBrnz(i);
+#if DEBUG
+            printf(" EXEC BRNZ\n");
+#endif
+            execBrnz(instr);
             break;
+
         case 0x0C:
-            execCall(i);
+#if DEBUG
+            printf(" EXEC CALL\n");
+#endif
+            execCall(instr);
             break;
+
         case 0x0D:
+#if DEBUG
+            printf(" EXEC RETURN\n");
+#endif
             execReturn();
             break;
 
+        case 0x0E:
+#if DEBUG
+            printf(" EXEC BRGT\n");
+#endif
+            execBrgt(instr);
+            break;
+
+        case 0x0F:
+#if DEBUG
+            printf(" EXEC PRIV\n");
+#endif
+            execPriv(instr);
+            break;
+
+        // Memory operations
+        case 0x10:
+#if DEBUG
+            printf(" EXEC LOAD\n");
+#endif
+            execMovLoad(instr);
+            break;
+
+        case 0x11:
+#if DEBUG
+            printf(" EXEC MOV REG\n");
+#endif
+            execMovReg(instr);
+            break;
+
+        case 0x12:
+#if DEBUG
+            printf(" EXEC MOV IMM\n");
+#endif
+            execMovImm(instr);
+            break;
+
+        case 0x13:
+#if DEBUG
+            printf(" EXEC STORE\n");
+#endif
+            execMovStore(instr);
+            break;
+
+        // Floating point
+        case 0x14:
+#if DEBUG
+            printf(" EXEC ADDF\n");
+#endif
+            execAddf(instr);
+            break;
+
+        case 0x15:
+#if DEBUG
+            printf(" EXEC SUBF\n");
+#endif
+            execSubf(instr);
+            break;
+
+        case 0x16:
+#if DEBUG
+            printf(" EXEC MULF\n");
+#endif
+            execMulf(instr);
+            break;
+
+        case 0x17:
+#if DEBUG
+            printf(" EXEC DIVF\n");
+#endif
+            execDivf(instr);
+            break;
+
+        // Arithmetic
+        case 0x18:
+#if DEBUG
+            printf(" EXEC ADD\n");
+#endif
+            execAdd(instr);
+            break;
+
+        case 0x19:
+#if DEBUG
+            printf(" EXEC ADDI\n");
+#endif
+            execAddi(instr);
+            break;
+
+        case 0x1A:
+#if DEBUG
+            printf(" EXEC SUB\n");
+#endif
+            execSub(instr);
+            break;
+
+        case 0x1B:
+#if DEBUG
+            printf(" EXEC SUBI\n");
+#endif
+            execSubi(instr);
+            break;
+
+        case 0x1C:
+#if DEBUG
+            printf(" EXEC MUL\n");
+#endif
+            execMul(instr);
+            break;
+
+        case 0x1D:
+#if DEBUG
+            printf(" EXEC DIV\n");
+#endif
+            execDiv(instr);
+            break;
+
         default:
-            fprintf(stderr, "Simulation error\n");
+            printf("UNKNOWN OPCODE %x at PC 0x%lx\n", op, pc);
             exit(1);
         }
+
+#if DEBUG
+        printf("\nREGISTERS:\n");
+        for (int i = 0; i < 8; i++)
+            printf("r%d=%lu ", i, regs[i]);
+        printf("\n");
+#endif
     }
 }
 
@@ -456,9 +607,21 @@ int procFile(const char *file) {
         return 1;
     }
 
-    // vlidate file type
+    // check segment overlap
+    uint64_t code_end = header.code_seg_begin + header.code_seg_size;
+    uint64_t data_end = header.data_seg_begin + header.data_seg_size;
+
+    if (header.data_seg_size > 0 && !(code_end <= header.data_seg_begin ||
+                                      data_end <= header.code_seg_begin)) {
+
+        fprintf(stderr, "Simulation error\n");
+        fclose(f);
+        return 1;
+    }
+
+    // validate file type
     if (header.file_type != 0) {
-        fprintf(stderr, "Invalid tinker file: unknown file type %llu\n", 
+        fprintf(stderr, "Invalid tinker file: unknown file type %llu\n",
                 (unsigned long long)header.file_type);
         fclose(f);
         return 1;
@@ -466,23 +629,26 @@ int procFile(const char *file) {
 
     // validate that segments fit within memory
     if (header.code_seg_begin + header.code_seg_size > MEM_SIZE) {
-        fprintf(stderr, "Invalid tinker file: code segment exceeds memory bounds\n");
+        fprintf(stderr,
+                "Invalid tinker file: code segment exceeds memory bounds\n");
         fclose(f);
         return 1;
     }
 
     if (header.data_seg_size > 0 &&
         header.data_seg_begin + header.data_seg_size > MEM_SIZE) {
-        fprintf(stderr, "Invalid tinker file: data segment exceeds memory bounds\n");
+        fprintf(stderr,
+                "Invalid tinker file: data segment exceeds memory bounds\n");
         fclose(f);
         return 1;
     }
 
     // load code segment into memory at code_seg_begin
     if (header.code_seg_size > 0) {
-        if (fread(&mem[header.code_seg_begin], 1, header.code_seg_size, f)
-                != header.code_seg_size) {
-            fprintf(stderr, "Invalid tinker file: could not read code segment\n");
+        if (fread(mem + header.code_seg_begin, 1, header.code_seg_size, f) !=
+            header.code_seg_size) {
+            fprintf(stderr,
+                    "Invalid tinker file: could not read code segment\n");
             fclose(f);
             return 1;
         }
@@ -490,15 +656,34 @@ int procFile(const char *file) {
 
     // load data segment into memory at data_seg_begin
     if (header.data_seg_size > 0) {
-        if (fread(&mem[header.data_seg_begin], 1, header.data_seg_size, f)
-                != header.data_seg_size) {
-            fprintf(stderr, "Invalid tinker file: could not read data segment\n");
+        if (fread(&mem[header.data_seg_begin], 1, header.data_seg_size, f) !=
+            header.data_seg_size) {
+            fprintf(stderr,
+                    "Invalid tinker file: could not read data segment\n");
             fclose(f);
             return 1;
         }
     }
 
-    // set PC to beginning of code segment
+#if DEBUG
+    printf("\nFILE LOADED\n");
+    printf(" code_begin=0x%lx\n", header.code_seg_begin);
+    printf(" code_size=%lu\n", header.code_seg_size);
+    printf(" data_begin=0x%lx\n", header.data_seg_begin);
+    printf(" data_size=%lu\n", header.data_seg_size);
+
+    printf("\nFIRST 5 INSTRUCTIONS IN MEMORY:\n");
+
+    for (int i = 0; i < 20; i += 4) {
+        uint32_t instr = mem[header.code_seg_begin + i] |
+                         (mem[header.code_seg_begin + i + 1] << 8) |
+                         (mem[header.code_seg_begin + i + 2] << 16) |
+                         (mem[header.code_seg_begin + i + 3] << 24);
+
+        printf(" 0x%lx : 0x%08x\n", header.code_seg_begin + i, instr);
+    }
+#endif
+
     pc = header.code_seg_begin;
 
     fclose(f);

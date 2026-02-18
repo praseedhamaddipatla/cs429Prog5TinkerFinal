@@ -17,8 +17,6 @@
 ; if n == 1 output 0
 	out r10, r2
 	halt
-
-
 :checktwo
 ; check if n == 2
 	sub r7, r1, r6
@@ -27,13 +25,9 @@
 ; if n == 2 output 1
 	out r10, r3
 	halt
-
-
 :init
 ; prepare loop counter = n - 2
 	subi r1, 2
-
-
 :loop
 ; next = prev + curr
 	add r4, r2, r3
@@ -45,8 +39,6 @@
 ; repeat loop if counter != 0
 	ld r20, :loop
 	brnz r20, r1
-
-
 ; output result
 	out r10, r3
 	halt

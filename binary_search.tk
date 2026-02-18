@@ -4,14 +4,11 @@
 	ld r9, 3
 	ld r8, 65664
 	ld r11, 8
-
 ; read number of elements in array
 	in r1, r10
-
 ; initialize offset and loop counter
 	clr r4
 	mov r7, r1
-
 ; load array elements into memory
 :loadloop
 	in r2, r10
@@ -21,18 +18,15 @@
 	subi r7, 1
 	ld r20, :loadloop
 	brnz r20, r7
-
 ; read target value and initialize search bounds
 	in r2, r10
 	clr r3
 	mov r4, r1
 	subi r4, 1
-
 ; binary search loop
 :binsearchloop
 	ld r20, :notfound
 	brgt r20, r3, r4
-
 ; compute middle index and load middle element
 	add r5, r3, r4
 	ld r16, 2
@@ -40,16 +34,13 @@
 	mul r12, r5, r11
 	add r12, r8, r12
 	mov r7, (r12)(0)
-
 ; compare middle element with target
 	sub r13, r7, r2
 	ld r20, :found
 	brnz r20, r13
-
 ; print "found" message
 	ld r25, 65536
 	ld r21, 6
-
 :printfound
 	mov r22, (r25)(0)
 	out r9, r22
@@ -59,7 +50,6 @@
 	brnz r23, r21
 	ld r20, :end
 	br r20
-
 ; decide which half of array to search next
 :found
 	ld r20, :searchR
@@ -68,19 +58,16 @@
 	subi r4, 1
 	ld r20, :binsearchloop
 	br r20
-
 ; search right half
 :searchR
 	mov r3, r5
 	addi r3, 1
 	ld r20, :binsearchloop
 	br r20
-
 ; print "not found" message
 :notfound
 	ld r25, 65584
 	ld r21, 10
-
 :printnotfound
 	mov r22, (r25)(0)
 	out r9, r22
@@ -88,11 +75,9 @@
 	subi r21, 1
 	ld r23, :printnotfound
 	brnz r23, r21
-
 ; terminate program
 :end
 	halt
-
 .data
 	102
 	111

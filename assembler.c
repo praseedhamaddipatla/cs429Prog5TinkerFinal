@@ -1091,13 +1091,156 @@ void validateFile(const char *filename) {
                             parseNumber(tokens[4]);
                     }
                 } else if (strcmp(opcode, "mov") == 0) {
-                    if (argCount < 2) {
-                        fprintf(stderr, "error: instruction 'mov' expects at "
-                                        "least 2 args\n");
-                        hasError = 1;
+                    // Determine which variant based on whether args contain '('
+                    // We need to work from the raw content line, not tokens
+                    // (parens stripped) Re-examine content directly for the
+                    // four forms:
+                    //   mov rd, (rs)(L)   -> arg0 is register, arg1 starts with
+                    //   '(' mov rd, rs        -> arg0 is register, arg1 is
+                    //   register (no parens) mov rd, L         -> arg0 is
+                    //   register, arg1 is a literal (no parens, not register)
+                    //   mov (rd)(L), rs   -> arg0 starts with '('
+
+                    // Check raw content for leading '('
+                    char *parenCheck = content;
+                    while (*parenCheck == ' ' || *parenCheck == '\t')
+                        parenCheck++;
+                    // skip "mov"
+                    parenCheck += 3;
+                    while (*parenCheck == ' ' || *parenCheck == '\t')
+                        parenCheck++;
+
+                    int destIsMem = (*parenCheck == '(');
+
+                    if (destIsMem) {
+                        // mov (rd)(L), rs
+                        // tokens after stripping parens: tokens[1]=rd,
+                        // tokens[2]=L, tokens[3]=rs
+                        if (argCount != 3) {
+                            fprintf(stderr,
+                                    "error: mov (rd)(L),rs expects 3 args, got "
+                                    "%d\n",
+                                    argCount);
+                            hasError = 1;
+                        } else {
+                            validateRegister(tokens[1]);
+                            // tokens[2] is L: 12-bit signed
+                            if (tokens[2][0] != ':') {
+                                errno = 0;
+                                char *end;
+                                long long val = strtoll(tokens[2], &end, 0);
+                                if (end == tokens[2] || *end != '\0') {
+                                    fprintf(
+                                        stderr,
+                                        "error: invalid offset '%s' in mov\n",
+                                        tokens[2]);
+                                    hasError = 1;
+                                } else if (errno == ERANGE || val < -2048 ||
+                                           val > 2047) {
+                                    fprintf(stderr,
+                                            "error: offset out of range (-2048 "
+                                            "to 2047): %s\n",
+                                            tokens[2]);
+                                    hasError = 1;
+                                }
+                            }
+                            validateRegister(tokens[3]);
+                        }
+                    } else {
+                        // dest is a register: mov rd, ...
+                        if (argCount < 2) {
+                            fprintf(stderr,
+                                    "error: mov expects at least 2 args\n");
+                            hasError = 1;
+                        } else {
+                            validateRegister(tokens[1]); // rd always a register
+
+                            // find where the source starts in raw content to
+                            // check for '(' check if source arg contains '('
+                            // look for '(' after the comma in content
+                            char *comma = strchr(content, ',');
+                            int srcIsMem = 0;
+                            if (comma) {
+                                char *src = comma + 1;
+                                while (*src == ' ' || *src == '\t')
+                                    src++;
+                                srcIsMem = (*src == '(');
+                            }
+
+                            if (srcIsMem) {
+                                // mov rd, (rs)(L)
+                                // tokens: tokens[1]=rd, tokens[2]=rs,
+                                // tokens[3]=L
+                                if (argCount != 3) {
+                                    fprintf(stderr,
+                                            "error: mov rd,(rs)(L) expects 3 "
+                                            "args, got %d\n",
+                                            argCount);
+                                    hasError = 1;
+                                } else {
+                                    validateRegister(tokens[2]); // rs
+                                    // tokens[3] is L: 12-bit signed
+                                    if (tokens[3][0] != ':') {
+                                        errno = 0;
+                                        char *end;
+                                        long long val =
+                                            strtoll(tokens[3], &end, 0);
+                                        if (end == tokens[3] || *end != '\0') {
+                                            fprintf(stderr,
+                                                    "error: invalid offset "
+                                                    "'%s' in mov\n",
+                                                    tokens[3]);
+                                            hasError = 1;
+                                        } else if (errno == ERANGE ||
+                                                   val < -2048 || val > 2047) {
+                                            fprintf(
+                                                stderr,
+                                                "error: offset out of range "
+                                                "(-2048 to 2047): %s\n",
+                                                tokens[3]);
+                                            hasError = 1;
+                                        }
+                                    }
+                                }
+                            } else {
+                                // mov rd, rs  or  mov rd, L
+                                if (argCount != 2) {
+                                    fprintf(stderr,
+                                            "error: mov rd,rs or mov rd,L "
+                                            "expects 2 args, got %d\n",
+                                            argCount);
+                                    hasError = 1;
+                                } else if (tokens[2][0] == 'r' &&
+                                           isdigit(
+                                               (unsigned char)tokens[2][1])) {
+                                    // mov rd, rs
+                                    validateRegister(tokens[2]);
+                                } else {
+                                    // mov rd, L — 12-bit unsigned (0-4095)
+                                    if (tokens[2][0] != ':') {
+                                        errno = 0;
+                                        char *end;
+                                        unsigned long long val =
+                                            strtoull(tokens[2], &end, 0);
+                                        if (end == tokens[2] || *end != '\0') {
+                                            fprintf(stderr,
+                                                    "error: invalid literal "
+                                                    "'%s' in mov\n",
+                                                    tokens[2]);
+                                            hasError = 1;
+                                        } else if (errno == ERANGE ||
+                                                   val > 4095) {
+                                            fprintf(stderr,
+                                                    "error: literal out of "
+                                                    "range (0-4095): %s\n",
+                                                    tokens[2]);
+                                            hasError = 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                    // parentheses consistency already checked above;
-                    // nothing more needed at this stage
                 } else {
                     fprintf(stderr, "error: unknown instruction '%s'\n",
                             opcode);

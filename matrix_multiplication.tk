@@ -4,14 +4,19 @@
 	ld r18, 2
 ; read matrix dimension n
 	in r1, r19
-; compute total elements and matrix size in bytes
+; compute total elements
 	mul r17, r1, r1
+; element size = 8 bytes
 	ld r11, 8
+; total matrix size in bytes
 	mul r21, r17, r11
-; set base addresses for matrices A, B, and C
+; base address A
 	ld r8, 65536
+; base address B
 	add r9, r8, r21
+; base address C
 	add r10, r9, r21
+; load matrix A
 	clr r4
 	mov r6, r17
 :loop1
@@ -22,6 +27,7 @@
 	subi r6, 1
 	ld r20, :loop1
 	brnz r20, r6
+; load matrix B
 	clr r4
 	mov r6, r17
 :loop2
@@ -32,11 +38,15 @@
 	subi r6, 1
 	ld r20, :loop2
 	brnz r20, r6
+; outer loop i
 	clr r4
 :outerloop
+; middle loop j
 	clr r5
 :midloop
+; inner loop k
 	clr r6
+; floating accumulator = 0.0
 	clr r14
 :innerloop
 ; load A[i][k]
@@ -51,34 +61,32 @@
 	mul r13, r13, r11
 	add r13, r9, r13
 	mov r16, (r13)(0)
-; convert to float
-	cvtf r23, r15
-	cvtf r24, r16
-; multiply floats
-	mulf r22, r23, r24
-; accumulate
+; multiply double values
+	mulf r22, r15, r16
+; accumulate double sum
 	addf r14, r14, r22
-; k++
+; increment k
 	addi r6, 1
 	sub r7, r1, r6
 	ld r20, :innerloop
 	brnz r20, r7
-; store result C[i][j]
+; store C[i][j]
 	mul r12, r4, r1
 	add r12, r12, r5
 	mul r12, r12, r11
 	add r12, r10, r12
 	mov (r12)(0), r14
-; j++
+; increment j
 	addi r5, 1
 	sub r7, r1, r5
 	ld r20, :midloop
 	brnz r20, r7
-; i++
+; increment i
 	addi r4, 1
 	sub r7, r1, r4
 	ld r20, :outerloop
 	brnz r20, r7
+; output result matrix
 	clr r4
 	mov r6, r17
 :outputloop
@@ -89,5 +97,5 @@
 	subi r6, 1
 	ld r20, :outputloop
 	brnz r20, r6
-; done
+; halt program
 	halt

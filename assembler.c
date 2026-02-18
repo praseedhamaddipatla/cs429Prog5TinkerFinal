@@ -1085,14 +1085,12 @@ void validateFile(const char *filename) {
                         validateRegister(tokens[2]);
                     }
                 } else if (strcmp(opcode, "call") == 0) {
-                    if (argCount != 3) {
+                    if (argCount != 1) {
                         fprintf(stderr,
-                                "error: instruction 'call' expects 3 args\n");
+                                "error: instruction 'call' expects 1 args\n");
                         hasError = 1;
                     } else {
                         validateRegister(tokens[1]);
-                        validateRegister(tokens[2]);
-                        validateRegister(tokens[3]);
                     }
                 } else if (strcmp(opcode, "return") == 0) {
                     if (argCount != 0) {

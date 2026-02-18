@@ -797,15 +797,9 @@ void validateFile(const char *filename) {
                 fclose(f);
                 return;
             }
-            if (!isalpha(rawLine[i]) && rawLine[i] != '_') {
-                fprintf(stderr, "error line %d: invalid label\n", lineNum);
-                hasError = 1;
-                fclose(f);
-                return;
-            }
 
             int start = i;
-            while (isalnum(rawLine[i]) || rawLine[i] == '_')
+            while (!isspace(rawLine[i]))
                 i++;
 
             if (i == start) {

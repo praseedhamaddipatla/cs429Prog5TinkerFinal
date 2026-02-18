@@ -73,7 +73,7 @@ void store64(uint64_t addr, uint64_t val) {
 // fetch
 uint32_t fetchInstr(void) {
     if (pc + 3 >= MEM_SIZE) {
-        fprintf(stderr, "FETCH ERROR: PC out of bounds: 0x%lx\n", pc);
+        fprintf(stderr, "Simulation error \n", pc);
         exit(1);
     }
 
@@ -580,7 +580,7 @@ void runSim(void) {
             break;
 
         default:
-            printf("UNKNOWN OPCODE %x at PC 0x%lx\n", op, pc);
+            fprintf(stderr, "Simulation error\n");
             exit(1);
         }
 
@@ -602,7 +602,7 @@ int procFile(const char *file) {
     // read the header
     TinkerFileHeader header;
     if (fread(&header, sizeof(TinkerFileHeader), 1, f) != 1) {
-        fprintf(stderr, "Invalid tinker file: could not read header\n");
+        fprintf(stderr, "Simulation error\n");
         fclose(f);
         return 1;
     }
@@ -621,7 +621,7 @@ int procFile(const char *file) {
 
     // validate file type
     if (header.file_type != 0) {
-        fprintf(stderr, "Invalid tinker file: unknown file type %llu\n",
+        fprintf(stderr, "Simulation error\n",
                 (unsigned long long)header.file_type);
         fclose(f);
         return 1;
@@ -630,7 +630,7 @@ int procFile(const char *file) {
     // validate that segments fit within memory
     if (header.code_seg_begin + header.code_seg_size > MEM_SIZE) {
         fprintf(stderr,
-                "Invalid tinker file: code segment exceeds memory bounds\n");
+                "Simulation error\n");
         fclose(f);
         return 1;
     }
@@ -638,7 +638,7 @@ int procFile(const char *file) {
     if (header.data_seg_size > 0 &&
         header.data_seg_begin + header.data_seg_size > MEM_SIZE) {
         fprintf(stderr,
-                "Invalid tinker file: data segment exceeds memory bounds\n");
+                "Simulation error\n");
         fclose(f);
         return 1;
     }
@@ -648,7 +648,7 @@ int procFile(const char *file) {
         if (fread(mem + header.code_seg_begin, 1, header.code_seg_size, f) !=
             header.code_seg_size) {
             fprintf(stderr,
-                    "Invalid tinker file: could not read code segment\n");
+                    "Simulation error\n");
             fclose(f);
             return 1;
         }
@@ -659,7 +659,7 @@ int procFile(const char *file) {
         if (fread(&mem[header.data_seg_begin], 1, header.data_seg_size, f) !=
             header.data_seg_size) {
             fprintf(stderr,
-                    "Invalid tinker file: could not read data segment\n");
+                    "Simulation error\n");
             fclose(f);
             return 1;
         }

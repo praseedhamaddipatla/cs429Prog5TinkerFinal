@@ -785,19 +785,6 @@ void validateFile(const char *filename) {
         if (rawLine[0] == ':') {
             int i = 1;
 
-            if (rawLine[i] == '\n' || rawLine[i] == '\0') {
-                fprintf(stderr, "error line %d: empty label\n", lineNum);
-                hasError = 1;
-                fclose(f);
-                return;
-            }
-            if (rawLine[i] == ' ' || rawLine[i] == '\t') {
-                fprintf(stderr, "error line %d: invalid label\n", lineNum);
-                hasError = 1;
-                fclose(f);
-                return;
-            }
-
             int start = i;
             while (!isspace(rawLine[i]))
                 i++;
@@ -812,7 +799,7 @@ void validateFile(const char *filename) {
             while (rawLine[i] == ' ' || rawLine[i] == '\t')
                 i++;
 
-            if (rawLine[i] != '\n' && rawLine[i] != '\0') {
+            if (!isspace(rawLine[i])) {
                 fprintf(stderr, "error line %d: invalid label\n", lineNum);
                 hasError = 1;
                 fclose(f);

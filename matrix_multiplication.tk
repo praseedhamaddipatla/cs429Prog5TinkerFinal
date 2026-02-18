@@ -12,10 +12,8 @@
 	ld r8, 65536
 	add r9, r8, r21
 	add r10, r9, r21
-; initialize counters for loading matrix A
 	clr r4
 	mov r6, r17
-; load matrix A from input into memory
 :loop1
 	in r15, r19
 	add r12, r8, r4
@@ -24,10 +22,8 @@
 	subi r6, 1
 	ld r20, :loop1
 	brnz r20, r6
-; initialize counters for loading matrix B
 	clr r4
 	mov r6, r17
-; load matrix B from input into memory
 :loop2
 	in r15, r19
 	add r12, r9, r4
@@ -36,53 +32,55 @@
 	subi r6, 1
 	ld r20, :loop2
 	brnz r20, r6
-; initialize outer loop (row index i)
 	clr r4
-; outer loop over rows of result matrix
 :outerloop
 	clr r5
-; middle loop over columns of result matrix
 :midloop
 	clr r6
 	clr r14
-; inner loop computes dot product of row i and column j
 :innerloop
+; load A[i][k]
 	mul r12, r4, r1
 	add r12, r12, r6
 	mul r12, r12, r11
 	add r12, r8, r12
 	mov r15, (r12)(0)
+; load B[k][j]
 	mul r13, r6, r1
 	add r13, r13, r5
 	mul r13, r13, r11
 	add r13, r9, r13
 	mov r16, (r13)(0)
-	mulf r22, r15, r16
+; convert to float
+	cvtf r23, r15
+	cvtf r24, r16
+; multiply floats
+	mulf r22, r23, r24
+; accumulate
 	addf r14, r14, r22
+; k++
 	addi r6, 1
 	sub r7, r1, r6
 	ld r20, :innerloop
 	brnz r20, r7
-; store computed element in result matrix
+; store result C[i][j]
 	mul r12, r4, r1
 	add r12, r12, r5
 	mul r12, r12, r11
 	add r12, r10, r12
 	mov (r12)(0), r14
-; advance to next column
+; j++
 	addi r5, 1
 	sub r7, r1, r5
 	ld r20, :midloop
 	brnz r20, r7
-; advance to next row
+; i++
 	addi r4, 1
 	sub r7, r1, r4
 	ld r20, :outerloop
 	brnz r20, r7
-; initialize counters for output
 	clr r4
 	mov r6, r17
-; output result matrix elements
 :outputloop
 	add r12, r10, r4
 	mov r15, (r12)(0)
@@ -91,5 +89,5 @@
 	subi r6, 1
 	ld r20, :outputloop
 	brnz r20, r6
-; terminate program
+; done
 	halt

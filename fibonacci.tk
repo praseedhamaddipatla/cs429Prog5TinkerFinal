@@ -1,16 +1,16 @@
 .code
-; take user input and store in r1
+; put input in r1
 	ld r11, 0
 	in r1, r11
-; set output register
+; set output
 	ld r10, 1
-; initialize fib values
+; init fib values
 	ld r2, 0
 	ld r3, 1
-; constants for comparison
+; consts for comparison
 	ld r5, 1
 	ld r6, 2
-; check if n == 1
+; check n == 1
 	sub r7, r1, r5
 	ld r20, :checktwo
 	brnz r20, r7
@@ -26,17 +26,17 @@
 	out r10, r3
 	halt
 :init
-; prepare loop counter = n - 2
+; loop counter = n - 2
 	subi r1, 2
 :loop
 ; next = prev + curr
 	add r4, r2, r3
-; shift values forward
+; shift vals forward
 	mov r2, r3
 	mov r3, r4
-; decrement counter
+; counter--
 	subi r1, 1
-; repeat loop if counter != 0
+; repeat if counter != 0
 	ld r20, :loop
 	brnz r20, r1
 ; output result

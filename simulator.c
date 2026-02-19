@@ -8,7 +8,6 @@
 #define MEM_SIZE (1 << 19)
 #define REG 32
 #define INC 4
-#define DEBUG 0
 
 // tinker file header
 typedef struct {
@@ -80,11 +79,6 @@ uint32_t fetchInstr(void) {
     uint32_t instr = mem[pc] | (mem[pc + 1] << 8) | (mem[pc + 2] << 16) |
                      (mem[pc + 3] << 24);
 
-#if DEBUG
-    printf("\nFETCH\n");
-    printf(" PC = 0x%lx\n", pc);
-    printf(" INSTR = 0x%08x\n", instr);
-#endif
 
     return instr;
 }
@@ -212,9 +206,6 @@ void execPriv(uint32_t i) {
         uint64_t p = regs[rs];
 
         if (p == 0 || p == 2) {
-            // port 0 and port 2: read unsigned integer from stdin
-            // The raw bits can be interpreted as IEEE 754 double for
-            // floating-point ops
             char buf[256];
             if (!fgets(buf, sizeof(buf), stdin)) {
                 fprintf(stderr, "Simulation error\n");
@@ -260,7 +251,7 @@ void execPriv(uint32_t i) {
         uint64_t p = regs[rd];
         if (p == 1 || p == 2) {
             // port 1 and port 2: print unsigned integer
-            // For port 2, these are IEEE 754 double bits printed as uint64
+            // IEEE 754 double bits printed as uint64 for port 2
             printf("%lu\n", (long unsigned int)regs[rs]);
         } else if (p == 3) {
             // port 3: print single ASCII character
@@ -341,241 +332,136 @@ void execReturn() {
 
 // main loop
 void runSim(void) {
-#if DEBUG
-    int step = 0;
-#endif
 
     while (running) {
-
-#if DEBUG
-        printf("\n=============================\n");
-        printf("STEP %d\n", step++);
-        printf("=============================\n");
-#endif
 
         uint32_t instr = fetchInstr();
         uint32_t op = getOpcode(instr);
 
-#if DEBUG
-        printf(" opcode = 0x%x\n", op);
-        printf(" rd=%u rs=%u rt=%u imm=%d\n", getrd(instr), getrs(instr),
-               getrt(instr), getL(instr));
-#endif
-
         switch (op) {
         // Logic operations
         case 0x00:
-#if DEBUG
-            printf(" EXEC AND\n");
-#endif
             execAnd(instr);
             break;
 
         case 0x01:
-#if DEBUG
-            printf(" EXEC OR\n");
-#endif
             execOr(instr);
             break;
 
         case 0x02:
-#if DEBUG
-            printf(" EXEC XOR\n");
-#endif
             execXor(instr);
             break;
 
         case 0x03:
-#if DEBUG
-            printf(" EXEC NOT\n");
-#endif
             execNot(instr);
             break;
 
         // Shifts
         case 0x04:
-#if DEBUG
-            printf(" EXEC SHFTR\n");
-#endif
             execShftr(instr);
             break;
 
         case 0x05:
-#if DEBUG
-            printf(" EXEC SHFTRI\n");
-#endif
             execShftri(instr);
             break;
 
         case 0x06:
-#if DEBUG
-            printf(" EXEC SHFTL\n");
-#endif
             execShftl(instr);
             break;
 
         case 0x07:
-#if DEBUG
-            printf(" EXEC SHFTLI\n");
-#endif
             execShftli(instr);
             break;
 
         // Control flow
         case 0x08:
-#if DEBUG
-            printf(" EXEC BR\n");
-#endif
             execBr(instr);
             break;
 
         case 0x09:
-#if DEBUG
-            printf(" EXEC BRR (reg)\n");
-#endif
             execBrrReg(instr);
             break;
 
         case 0x0A:
-#if DEBUG
-            printf(" EXEC BRR (imm)\n");
-#endif
             execBrrImm(instr);
             break;
 
         case 0x0B:
-#if DEBUG
-            printf(" EXEC BRNZ\n");
-#endif
             execBrnz(instr);
             break;
 
         case 0x0C:
-#if DEBUG
-            printf(" EXEC CALL\n");
-#endif
             execCall(instr);
             break;
 
         case 0x0D:
-#if DEBUG
-            printf(" EXEC RETURN\n");
-#endif
             execReturn();
             break;
 
         case 0x0E:
-#if DEBUG
-            printf(" EXEC BRGT\n");
-#endif
             execBrgt(instr);
             break;
 
         case 0x0F:
-#if DEBUG
-            printf(" EXEC PRIV\n");
-#endif
             execPriv(instr);
             break;
 
         // Memory operations
         case 0x10:
-#if DEBUG
-            printf(" EXEC LOAD\n");
-#endif
             execMovLoad(instr);
             break;
 
         case 0x11:
-#if DEBUG
-            printf(" EXEC MOV REG\n");
-#endif
             execMovReg(instr);
             break;
 
         case 0x12:
-#if DEBUG
-            printf(" EXEC MOV IMM\n");
-#endif
             execMovImm(instr);
             break;
 
         case 0x13:
-#if DEBUG
-            printf(" EXEC STORE\n");
-#endif
             execMovStore(instr);
             break;
 
         // Floating point
         case 0x14:
-#if DEBUG
-            printf(" EXEC ADDF\n");
-#endif
             execAddf(instr);
             break;
 
         case 0x15:
-#if DEBUG
-            printf(" EXEC SUBF\n");
-#endif
             execSubf(instr);
             break;
 
         case 0x16:
-#if DEBUG
-            printf(" EXEC MULF\n");
-#endif
             execMulf(instr);
             break;
 
         case 0x17:
-#if DEBUG
-            printf(" EXEC DIVF\n");
-#endif
             execDivf(instr);
             break;
 
         // Arithmetic
         case 0x18:
-#if DEBUG
-            printf(" EXEC ADD\n");
-#endif
             execAdd(instr);
             break;
 
         case 0x19:
-#if DEBUG
-            printf(" EXEC ADDI\n");
-#endif
             execAddi(instr);
             break;
 
         case 0x1A:
-#if DEBUG
-            printf(" EXEC SUB\n");
-#endif
             execSub(instr);
             break;
 
         case 0x1B:
-#if DEBUG
-            printf(" EXEC SUBI\n");
-#endif
             execSubi(instr);
             break;
 
         case 0x1C:
-#if DEBUG
-            printf(" EXEC MUL\n");
-#endif
             execMul(instr);
             break;
 
         case 0x1D:
-#if DEBUG
-            printf(" EXEC DIV\n");
-#endif
             execDiv(instr);
             break;
 
@@ -583,13 +469,6 @@ void runSim(void) {
             fprintf(stderr, "Simulation error\n");
             exit(1);
         }
-
-#if DEBUG
-        printf("\nREGISTERS:\n");
-        for (int i = 0; i < 8; i++)
-            printf("r%d=%lu ", i, regs[i]);
-        printf("\n");
-#endif
     }
 }
 
@@ -663,25 +542,6 @@ int procFile(const char *file) {
             return 1;
         }
     }
-
-#if DEBUG
-    printf("\nFILE LOADED\n");
-    printf(" code_begin=0x%lx\n", header.code_seg_begin);
-    printf(" code_size=%lu\n", header.code_seg_size);
-    printf(" data_begin=0x%lx\n", header.data_seg_begin);
-    printf(" data_size=%lu\n", header.data_seg_size);
-
-    printf("\nFIRST 5 INSTRUCTIONS IN MEMORY:\n");
-
-    for (int i = 0; i < 20; i += 4) {
-        uint32_t instr = mem[header.code_seg_begin + i] |
-                         (mem[header.code_seg_begin + i + 1] << 8) |
-                         (mem[header.code_seg_begin + i + 2] << 16) |
-                         (mem[header.code_seg_begin + i + 3] << 24);
-
-        printf(" 0x%lx : 0x%08x\n", header.code_seg_begin + i, instr);
-    }
-#endif
 
     pc = header.code_seg_begin;
 

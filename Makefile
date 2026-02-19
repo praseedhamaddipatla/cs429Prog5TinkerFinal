@@ -1,32 +1,28 @@
-# Compiler
+# compiler
 CC=gcc
 CFLAGS=-Wall -Wextra -O2
 
-# Binaries
+# binaries
 ASM=hw5-asm
 SIM=hw5-sim
 
-# Test harness
+# test harness
 TEST_BIN=tinker-test
 TEST_SRC=TinkerTest.c
 
-# Tinker programs
+# tinker
 TK_FILES=fibonacci.tk binary_search.tk matrix_multiplication.tk
 TKO_FILES=fibonacci.tko binary_search.tko matrix_multiplication.tko
 
-# Default target
+# target
 all: build assemble test-build test
 
-# ==========================================
-# Build assembler and simulator FIRST
-# ==========================================
+# build
 
 build:
 	./build.sh
 
-# ==========================================
-# Assemble with hexdump verification
-# ==========================================
+# hexdump for verification
 
 assemble: build $(TKO_FILES)
 
@@ -48,23 +44,17 @@ matrix_multiplication.tko: matrix_multiplication.tk
 	hexdump -C matrix_multiplication.tko | head -n 40
 	@echo
 
-# ==========================================
-# Build test harness
-# ==========================================
+# build test harness
 
 test-build:
 	$(CC) $(CFLAGS) -o $(TEST_BIN) $(TEST_SRC)
 
-# ==========================================
-# Run tests
-# ==========================================
+# run tests
 
 test:
 	./$(TEST_BIN)
 
-# ==========================================
-# Run programs manually
-# ==========================================
+# run programs separately
 
 run-fibonacci: assemble
 	./$(SIM) fibonacci.tko
@@ -80,9 +70,7 @@ run-matrix: assemble
 
 run-all: run-fibonacci run-binary run-matrix
 
-# ==========================================
-# Clean
-# ==========================================
+# cleanup: delete added files
 
 clean:
 	rm -f $(ASM) $(SIM)
@@ -90,8 +78,6 @@ clean:
 	rm -f $(TEST_BIN)
 	rm -f tmp_input.txt tmp_output.txt
 
-# ==========================================
-# Rebuild everything
-# ==========================================
+# rebuild
 
 rebuild: clean all

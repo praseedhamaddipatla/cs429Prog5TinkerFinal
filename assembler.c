@@ -10,11 +10,9 @@
 #define MAX_LABELS 512
 #define MAX_INSTS 2048
 
-#define DEBUG 0
-
 // segment base addresses
-#define CODE_START_ADDR 0x2000
-#define DATA_START_ADDR 0x10000
+#define CSTART 0x2000
+#define DSTART 0x10000
 
 // global arrays for labels and instructions
 typedef struct {
@@ -51,7 +49,7 @@ typedef struct {
 //  utility functions
 
 void cleanupAndExit() {
-    // remove the partially-written output if it exists
+    // remove anything written
     if (binaryFile)
         remove(binaryFile);
 
@@ -114,8 +112,8 @@ void firstPass(const char *filename) {
     }
 
     char buffer[MAX_LINE];
-    int codeAddress = CODE_START_ADDR;
-    int dataAddress = DATA_START_ADDR;
+    int codeAddress = CSTART;
+    int dataAddress = DSTART;
     int mode = -1; // -1 = unknown, 0 = data, 1 = code
 
     while (fgets(buffer, sizeof(buffer), f)) {
@@ -139,7 +137,7 @@ void firstPass(const char *filename) {
         if (buffer[0] == '.') {
             if (buffer[1] == 'c') {
                 mode = 1;
-                // patch any pending labels (addr == -1)
+                // patch pending labels (dir not assigned yet)
                 for (int i = 0; i < numLabels; i++) {
                     if (labels[i].addr == -1)
                         labels[i].addr = codeAddress;
@@ -400,8 +398,8 @@ void secondPass(const char *filename) {
     }
 
     char buffer[MAX_LINE];
-    int codeAddress = CODE_START_ADDR;
-    int dataAddress = DATA_START_ADDR;
+    int codeAddress = CSTART;
+    int dataAddress = DSTART;
     int mode = -1;
 
     while (fgets(buffer, sizeof(buffer), f)) {
@@ -631,15 +629,15 @@ void writeBinary(const char *filename) {
 
     TinkerFileHeader header;
     header.file_type = 0;
-    header.code_seg_begin = CODE_START_ADDR; // 0x2000
+    header.code_seg_begin = CSTART; // 0x2000
     header.code_seg_size = codeSize;
-    header.data_seg_begin = DATA_START_ADDR; // 0x10000
+    header.data_seg_begin = DSTART; // 0x10000
     header.data_seg_size = dataSize;
 
-    // Write header
+    // write header
     fwrite(&header, sizeof(header), 1, f);
 
-    // Write code segment IMMEDIATELY after header (no padding!)
+    // code segment after header (no padding)
     for (int i = 0; i < numInstructions; i++) {
         if (instructions[i].op[0] == '.')
             continue;
@@ -647,7 +645,7 @@ void writeBinary(const char *filename) {
             encodeInstruction(instructions[i], f);
     }
 
-    // Write data segment IMMEDIATELY after code (no padding!)
+    // data segment after code (no padding)
     for (int i = 0; i < numInstructions; i++) {
         if (instructions[i].op[0] == '.')
             continue;
@@ -659,7 +657,6 @@ void writeBinary(const char *filename) {
 }
 
 //  validation
-
 int hasError = 0;
 
 int isNegative(const char *str) { return str[0] == '-'; }
@@ -772,7 +769,7 @@ void validateFile(const char *filename) {
                 return;
             }
 
-            // space/tab immediately after colon is invalid (": L1")
+            // space immediately after colon invalid
             if (rawLine[i] == ' ' || rawLine[i] == '\t') {
                 fprintf(stderr,
                         "error line %d: invalid label (space after colon)\n",
@@ -782,7 +779,7 @@ void validateFile(const char *filename) {
                 return;
             }
 
-            // consume all non-whitespace characters
+            // consume all non-whitespace
             while (rawLine[i] != '\0' && rawLine[i] != '\n' &&
                    rawLine[i] != ' ' && rawLine[i] != '\t') {
                 i++;
@@ -792,8 +789,7 @@ void validateFile(const char *filename) {
             while (rawLine[i] == ' ' || rawLine[i] == '\t')
                 i++;
 
-            // if there's still non-whitespace content, label has internal space
-            // (":L 1")
+            // internal space
             if (rawLine[i] != '\n' && rawLine[i] != '\0') {
                 fprintf(
                     stderr,
@@ -823,7 +819,6 @@ void validateFile(const char *filename) {
 
             if (currentMode == 1) {
                 //  code section
-
                 // check parentheses balance and ordering
                 {
                     int openCount = 0;
@@ -1040,7 +1035,7 @@ void validateFile(const char *filename) {
                         } else if (tokens[1][0] == ':') {
                             // label form: validated later in second pass
                         } else {
-                            // literal form: must be 12-bit signed  –2048 … 2047
+                            // literal form: 12-bit signed
                             errno = 0;
                             char *end;
                             long long val = strtoll(tokens[1], &end, 0);
@@ -1106,17 +1101,7 @@ void validateFile(const char *filename) {
                             parseNumber(tokens[4]);
                     }
                 } else if (strcmp(opcode, "mov") == 0) {
-                    // Determine which variant based on whether args contain '('
-                    // We need to work from the raw content line, not tokens
-                    // (parens stripped) Re-examine content directly for the
-                    // four forms:
-                    //   mov rd, (rs)(L)   -> arg0 is register, arg1 starts with
-                    //   '(' mov rd, rs        -> arg0 is register, arg1 is
-                    //   register (no parens) mov rd, L         -> arg0 is
-                    //   register, arg1 is a literal (no parens, not register)
-                    //   mov (rd)(L), rs   -> arg0 starts with '('
-
-                    // Check raw content for leading '('
+                    // check raw content for leading '('
                     char *parenCheck = content;
                     while (*parenCheck == ' ' || *parenCheck == '\t')
                         parenCheck++;
@@ -1129,8 +1114,6 @@ void validateFile(const char *filename) {
 
                     if (destIsMem) {
                         // mov (rd)(L), rs
-                        // tokens after stripping parens: tokens[1]=rd,
-                        // tokens[2]=L, tokens[3]=rs
                         if (argCount != 3) {
                             fprintf(stderr,
                                     "error: mov (rd)(L),rs expects 3 args, got "
@@ -1162,7 +1145,7 @@ void validateFile(const char *filename) {
                             validateRegister(tokens[3]);
                         }
                     } else {
-                        // dest is a register: mov rd, ...
+                        // dest is a register
                         if (argCount < 2) {
                             fprintf(stderr,
                                     "error: mov expects at least 2 args\n");
@@ -1170,9 +1153,7 @@ void validateFile(const char *filename) {
                         } else {
                             validateRegister(tokens[1]); // rd always a register
 
-                            // find where the source starts in raw content to
-                            // check for '(' check if source arg contains '('
-                            // look for '(' after the comma in content
+                            // find where the source starts in raw content to check ( and )
                             char *comma = strchr(content, ',');
                             int srcIsMem = 0;
                             if (comma) {
@@ -1183,9 +1164,6 @@ void validateFile(const char *filename) {
                             }
 
                             if (srcIsMem) {
-                                // mov rd, (rs)(L)
-                                // tokens: tokens[1]=rd, tokens[2]=rs,
-                                // tokens[3]=L
                                 if (argCount != 3) {
                                     fprintf(stderr,
                                             "error: mov rd,(rs)(L) expects 3 "
@@ -1231,7 +1209,7 @@ void validateFile(const char *filename) {
                                     // mov rd, rs
                                     validateRegister(tokens[2]);
                                 } else {
-                                    // mov rd, L — 12-bit unsigned (0-4095)
+                                    // mov rd, L — 12-bit unsigned
                                     if (tokens[2][0] != ':') {
                                         errno = 0;
                                         char *end;
@@ -1279,7 +1257,7 @@ void validateFile(const char *filename) {
 
                 errno = 0;
                 char *end;
-                /*unsigned long long val =*/strtoull(content, &end, 0);
+                strtoull(content, &end, 0);
 
                 while (*end == ' ' || *end == '\t')
                     end++;
@@ -1331,10 +1309,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "usage: %s <input.tk> <output.tko>\n", argv[0]);
         return 1;
     }
-
-#if DEBUG
-    printf("Header size: %lu\n", sizeof(TinkerFileHeader));
-#endif
 
     binaryFile = argv[2];
 

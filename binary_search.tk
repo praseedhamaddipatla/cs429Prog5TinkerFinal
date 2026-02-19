@@ -1,15 +1,15 @@
 .code
-; load input port, output port, base address, and element size
+; load input, output, base addr, and element size
 	ld r10, 0
 	ld r9, 3
 	ld r8, 65664
 	ld r11, 8
-; read number of elements in array
+; read num elements
 	in r1, r10
-; initialize offset and loop counter
+; init offset and counter
 	clr r4
 	mov r7, r1
-; load array elements into memory
+; load into memory
 :loadloop
 	in r2, r10
 	add r12, r8, r4
@@ -18,7 +18,7 @@
 	subi r7, 1
 	ld r20, :loadloop
 	brnz r20, r7
-; read target value and initialize search bounds
+; read target val and init search
 	in r2, r10
 	clr r3
 	mov r4, r1
@@ -27,18 +27,18 @@
 :binsearchloop
 	ld r20, :notfound
 	brgt r20, r3, r4
-; compute middle index and load middle element
+; get and load middle
 	add r5, r3, r4
 	ld r16, 2
 	div r5, r5, r16
 	mul r12, r5, r11
 	add r12, r8, r12
 	mov r7, (r12)(0)
-; compare middle element with target
+; comp middle
 	sub r13, r7, r2
 	ld r20, :found
 	brnz r20, r13
-; print "found" message
+; print "found"
 	ld r25, 65536
 	ld r21, 6
 :printfound
@@ -50,7 +50,7 @@
 	brnz r23, r21
 	ld r20, :end
 	br r20
-; decide which half of array to search next
+; decide which half
 :found
 	ld r20, :searchR
 	brgt r20, r2, r7
@@ -58,13 +58,13 @@
 	subi r4, 1
 	ld r20, :binsearchloop
 	br r20
-; search right half
+; search right
 :searchR
 	mov r3, r5
 	addi r3, 1
 	ld r20, :binsearchloop
 	br r20
-; print "not found" message
+; print "not found"
 :notfound
 	ld r25, 65584
 	ld r21, 10
@@ -75,7 +75,7 @@
 	subi r21, 1
 	ld r23, :printnotfound
 	brnz r23, r21
-; terminate program
+; end
 :end
 	halt
 .data

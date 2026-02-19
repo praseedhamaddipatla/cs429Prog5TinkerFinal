@@ -20,9 +20,7 @@ void read_output(const char *filename, char *buffer, size_t size) {
     fclose(f);
 }
 
-/*
-   FIBONACCI TESTS
-    */
+//fibonacci tests
 
 void test_fibonacci_case(uint64_t input, uint64_t expected) {
     char cmd[256];
@@ -58,9 +56,7 @@ void test_fibonacci() {
     printf("Fibonacci tests passed.\n");
 }
 
-/*
-   MATRIX MULTIPLICATION TESTS
-    */
+//matrix mult tests
 
 void write_matrix_input_2x2() {
     FILE *f = fopen("tmp_input.txt", "w");
@@ -112,9 +108,7 @@ void test_matrix_multiplication() {
     printf("Matrix multiplication tests passed.\n");
 }
 
-/*
-   BINARY SEARCH TESTS
-    */
+// binary search tests
 
 void write_binary_input_found() {
     FILE *f = fopen("tmp_input.txt", "w");
@@ -164,7 +158,7 @@ void test_binary_search() {
 
     assert(strstr(buffer, "found") != NULL || strstr(buffer, "Found") != NULL);
 
-    // Case 2: Not Found
+    // not Found
     write_binary_input_not_found();
     run_command("./hw5-sim binary_search.tko < tmp_input.txt > tmp_output.txt");
 
@@ -174,16 +168,14 @@ void test_binary_search() {
     (void)var;
     fclose(f);
 
-    // Accept either -1 or message containing "not"
+    // message containing "not"
     assert(strstr(buffer, "-1") != NULL || strstr(buffer, "not") != NULL ||
            strstr(buffer, "Not") != NULL);
 
     printf("Binary search tests passed.\n");
 }
 
-/*
-   MAIN
-    */
+//main
 
 int main() {
     printf("\n");

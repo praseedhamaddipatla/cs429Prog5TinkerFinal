@@ -7,4 +7,4 @@ EID: psm2357
 
 To compile:./build.sh
 
-To run:./hw5
+To run:./hw5-asm or ./hw5-sim

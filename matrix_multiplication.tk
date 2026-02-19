@@ -1,24 +1,25 @@
 .code
-; load input and output ports
+; load port numbers
 	ld r19, 0
 	ld r18, 2
 ; read matrix dimension n
 	in r1, r19
-; compute total elements
+; compute n squared (total elements)
 	mul r17, r1, r1
-; element size = 8 bytes
+; set element size to 8 bytes
 	ld r11, 8
-; total matrix size in bytes
+; compute total matrix byte size
 	mul r21, r17, r11
-; base address A
+; set base address of matrix A
 	ld r8, 65536
-; base address B
+; set base address of matrix B
 	add r9, r8, r21
-; base address C
+; set base address of matrix C
 	add r10, r9, r21
-; load matrix A
+; initialize byte offset and loop counter for A load
 	clr r4
 	mov r6, r17
+; load matrix A row by row
 :loop1
 	in r15, r19
 	add r12, r8, r4
@@ -27,9 +28,10 @@
 	subi r6, 1
 	ld r20, :loop1
 	brnz r20, r6
-; load matrix B
+; initialize byte offset and loop counter for B load
 	clr r4
 	mov r6, r17
+; load matrix B row by row
 :loop2
 	in r15, r19
 	add r12, r9, r4
@@ -38,57 +40,64 @@
 	subi r6, 1
 	ld r20, :loop2
 	brnz r20, r6
-; outer loop i
+; initialize outer loop index i
 	clr r4
+; outer loop over rows i
 :outerloop
-; middle loop j
+; initialize middle loop index j
 	clr r5
+; middle loop over columns j
 :midloop
-; inner loop k
+; initialize inner loop index k
 	clr r6
-; floating accumulator = 0.0
+; initialize floating point accumulator to 0.0
 	clr r14
+; inner loop over k for dot product
 :innerloop
-; load A[i][k]
+; compute byte offset of A[i][k]
 	mul r12, r4, r1
 	add r12, r12, r6
 	mul r12, r12, r11
 	add r12, r8, r12
+; load A[i][k]
 	mov r15, (r12)(0)
-; load B[k][j]
+; compute byte offset of B[k][j]
 	mul r13, r6, r1
 	add r13, r13, r5
 	mul r13, r13, r11
 	add r13, r9, r13
+; load B[k][j]
 	mov r16, (r13)(0)
-; multiply double values
+; multiply A[i][k] and B[k][j] as doubles
 	mulf r22, r15, r16
-; accumulate double sum
+; accumulate product into C[i][j]
 	addf r14, r14, r22
-; increment k
+; increment k and check loop condition
 	addi r6, 1
 	sub r7, r1, r6
 	ld r20, :innerloop
 	brnz r20, r7
-; store C[i][j]
+; compute byte offset of C[i][j]
 	mul r12, r4, r1
 	add r12, r12, r5
 	mul r12, r12, r11
 	add r12, r10, r12
+; store result into C[i][j]
 	mov (r12)(0), r14
-; increment j
+; increment j and check loop condition
 	addi r5, 1
 	sub r7, r1, r5
 	ld r20, :midloop
 	brnz r20, r7
-; increment i
+; increment i and check loop condition
 	addi r4, 1
 	sub r7, r1, r4
 	ld r20, :outerloop
 	brnz r20, r7
-; output result matrix
+; initialize byte offset and countdown for output
 	clr r4
 	mov r6, r17
+; output result matrix row by row
 :outputloop
 	add r12, r10, r4
 	mov r15, (r12)(0)
@@ -97,5 +106,7 @@
 	subi r6, 1
 	ld r20, :outputloop
 	brnz r20, r6
-; halt program
+; halt the program
 	halt
+.data
+	0

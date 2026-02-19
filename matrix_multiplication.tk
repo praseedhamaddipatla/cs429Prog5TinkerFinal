@@ -1,24 +1,24 @@
 .code
-; initialize input port number
+; initialize input port 0 and output port 1
 	ld r19, 0
-; initialize output port number
-	ld r18, 2
-; read dimension n
+	ld r18, 1
+; read matrix dimension n
 	in r1, r19
-; store n in r1, set loop bound as n-1 is handled by comparison
-; set base addresses for A, B, C
-	ld r8, 65536
-; compute n*n
+; compute n squared
 	mul r2, r1, r1
-; compute n*n*8
+; set element size 8 bytes
 	ld r3, 8
+; compute total matrix byte size
 	mul r4, r2, r3
-; base of B = base of A + n*n*8
+; set base address of matrix A at 65536
+	ld r8, 65536
+; set base address of matrix B
 	add r9, r8, r4
-; base of C = base of B + n*n*8
+; set base address of matrix C
 	add r10, r9, r4
-; read in matrix A elements
+; initialize element index for loading A
 	clr r5
+; load all elements of matrix A
 :inputA
 	in r6, r19
 	mul r7, r5, r3
@@ -28,8 +28,9 @@
 	sub r7, r2, r5
 	ld r20, :inputA
 	brnz r20, r7
-; read in matrix B elements
+; initialize element index for loading B
 	clr r5
+; load all elements of matrix B
 :inputB
 	in r6, r19
 	mul r7, r5, r3
@@ -39,58 +40,61 @@
 	sub r7, r2, r5
 	ld r20, :inputB
 	brnz r20, r7
-; i = 0
+; initialize outer loop index i
 	clr r11
-; outer loop over i
+; outer loop over rows i
 :loopi
-; j = 0
+; initialize middle loop index j
 	clr r12
-; middle loop over j
+; middle loop over columns j
 :loopj
-; C[i][j] = 0.0
+; initialize accumulator C[i][j] to 0.0
 	clr r13
-; k = 0
+; initialize inner loop index k
 	clr r14
-; inner loop over k
+; inner loop over k for dot product
 :loopk
-; compute address of A[i][k]: (i*n + k) * 8 + base_A
+; compute address of A[i][k] = base_A + (i*n + k)*8
 	mul r15, r11, r1
 	add r15, r15, r14
 	mul r15, r15, r3
 	add r15, r8, r15
 	mov r15, (r15)(0)
-; compute address of B[k][j]: (k*n + j) * 8 + base_B
+; compute address of B[k][j] = base_B + (k*n + j)*8
 	mul r16, r14, r1
 	add r16, r16, r12
 	mul r16, r16, r3
 	add r16, r9, r16
 	mov r16, (r16)(0)
-; C[i][j] += A[i][k] * B[k][j]
+; multiply A[i][k] * B[k][j] as doubles
 	mulf r17, r15, r16
+; add product to accumulator
 	addf r13, r13, r17
-; k++, loop if k < n
+; increment k and continue if k < n
 	addi r14, 1
 	sub r7, r1, r14
 	ld r20, :loopk
 	brnz r20, r7
-; store C[i][j]: (i*n + j) * 8 + base_C
+; compute address of C[i][j] = base_C + (i*n + j)*8
 	mul r15, r11, r1
 	add r15, r15, r12
 	mul r15, r15, r3
 	add r15, r10, r15
+; store result into C[i][j]
 	mov (r15)(0), r13
-; j++, loop if j < n
+; increment j and continue if j < n
 	addi r12, 1
 	sub r7, r1, r12
 	ld r20, :loopj
 	brnz r20, r7
-; i++, loop if i < n
+; increment i and continue if i < n
 	addi r11, 1
 	sub r7, r1, r11
 	ld r20, :loopi
 	brnz r20, r7
-; output C row by row
+; initialize element index for output
 	clr r5
+; output all elements of matrix C
 :outputloop
 	mul r7, r5, r3
 	add r7, r10, r7
@@ -100,7 +104,7 @@
 	sub r7, r2, r5
 	ld r20, :outputloop
 	brnz r20, r7
-; halt
+; halt the program
 	halt
 .data
 	0

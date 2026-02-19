@@ -125,17 +125,32 @@ void firstPass(const char *filename) {
             continue;
 
         if (buffer[0] == ':') {
-            // validation already done in validateFile
-            int labelAddr = (mode == 1) ? codeAddress : dataAddress;
-            addLabel(buffer, labelAddr);
+
+            if (mode == -1) {
+
+                addLabel(buffer, -1); // placeholder
+            } else {
+                int labelAddr = (mode == 1) ? codeAddress : dataAddress;
+                addLabel(buffer, labelAddr);
+            }
             continue;
         }
 
         if (buffer[0] == '.') {
-            if (buffer[1] == 'c')
+            if (buffer[1] == 'c') {
                 mode = 1;
-            else if (buffer[1] == 'd')
+                // patch any pending labels (addr == -1)
+                for (int i = 0; i < numLabels; i++) {
+                    if (labels[i].addr == -1)
+                        labels[i].addr = codeAddress;
+                }
+            } else if (buffer[1] == 'd') {
                 mode = 0;
+                for (int i = 0; i < numLabels; i++) {
+                    if (labels[i].addr == -1)
+                        labels[i].addr = dataAddress;
+                }
+            }
             continue;
         }
 

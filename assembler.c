@@ -1,4 +1,3 @@
-
 #include <ctype.h>
 #include <errno.h>
 #include <stdint.h>
@@ -11,11 +10,9 @@
 #define MAX_LABELS 512
 #define MAX_INSTS 2048
 
-#define DEBUG 0
-
 // segment base addresses
-#define CODE_START_ADDR 0x2000
-#define DATA_START_ADDR 0x10000
+#define CSTART 0x2000
+#define DSTART 0x10000
 
 // global arrays for labels and instructions
 typedef struct {
@@ -52,7 +49,7 @@ typedef struct {
 //  utility functions
 
 void cleanupAndExit() {
-    // remove the partially-written output if it exists
+    // remove anything written
     if (binaryFile)
         remove(binaryFile);
 
@@ -107,6 +104,7 @@ int calculateInstructionSize(const char *opcode) {
     return 4;
 }
 
+// first pass, keep list of pending labels
 void firstPass(const char *filename) {
     FILE *f = fopen(filename, "r");
     if (!f) {
@@ -115,9 +113,13 @@ void firstPass(const char *filename) {
     }
 
     char buffer[MAX_LINE];
-    int codeAddress = CODE_START_ADDR;
-    int dataAddress = DATA_START_ADDR;
-    int mode = -1; // -1 = unknown, 0 = data, 1 = code
+    int codeAddress = CSTART;
+    int dataAddress = DSTART;
+    int mode = -1;
+
+    // indices of labels not yet assigned an address
+    int pending[MAX_LABELS];
+    int numPending = 0;
 
     while (fgets(buffer, sizeof(buffer), f)) {
         cleanLine(buffer);
@@ -126,31 +128,22 @@ void firstPass(const char *filename) {
             continue;
 
         if (buffer[0] == ':') {
-
-            if (mode == -1) {
-
-                addLabel(buffer, -1); // placeholder
-            } else {
-                int labelAddr = (mode == 1) ? codeAddress : dataAddress;
-                addLabel(buffer, labelAddr);
-            }
+            addLabel(buffer, -1);
+            pending[numPending++] = numLabels - 1;
             continue;
         }
 
         if (buffer[0] == '.') {
-            if (buffer[1] == 'c') {
+            if (strcmp(buffer, ".code") == 0) {
                 mode = 1;
-                // patch any pending labels (addr == -1)
-                for (int i = 0; i < numLabels; i++) {
-                    if (labels[i].addr == -1)
-                        labels[i].addr = codeAddress;
-                }
-            } else if (buffer[1] == 'd') {
+                for (int i = 0; i < numPending; i++)
+                    labels[pending[i]].addr = codeAddress;
+                numPending = 0;
+            } else if (strcmp(buffer, ".data") == 0) {
                 mode = 0;
-                for (int i = 0; i < numLabels; i++) {
-                    if (labels[i].addr == -1)
-                        labels[i].addr = dataAddress;
-                }
+                for (int i = 0; i < numPending; i++)
+                    labels[pending[i]].addr = dataAddress;
+                numPending = 0;
             }
             continue;
         }
@@ -159,15 +152,33 @@ void firstPass(const char *filename) {
             char *line = buffer + 1;
 
             if (mode == 1) {
+                // flush pending labels to current code address
+                for (int i = 0; i < numPending; i++)
+                    labels[pending[i]].addr = codeAddress;
+                numPending = 0;
+
                 char temp[MAX_LINE];
                 strcpy(temp, line);
                 char *opcode = strtok(temp, " ,");
                 if (opcode)
                     codeAddress += calculateInstructionSize(opcode);
             } else if (mode == 0) {
+                // flush pending labels to current data address
+                for (int i = 0; i < numPending; i++)
+                    labels[pending[i]].addr = dataAddress;
+                numPending = 0;
+
                 dataAddress += 8;
             }
         }
+    }
+
+    // any labels still pending at EOF
+    if (numPending > 0) {
+        int addr = (mode == 1) ? codeAddress : (mode == 0 ? dataAddress : 0);
+        for (int i = 0; i < numPending; i++)
+            labels[pending[i]].addr = addr;
+        numPending = 0;
     }
 
     fclose(f);
@@ -401,8 +412,8 @@ void secondPass(const char *filename) {
     }
 
     char buffer[MAX_LINE];
-    int codeAddress = CODE_START_ADDR;
-    int dataAddress = DATA_START_ADDR;
+    int codeAddress = CSTART;
+    int dataAddress = DSTART;
     int mode = -1;
 
     while (fgets(buffer, sizeof(buffer), f)) {
@@ -632,14 +643,15 @@ void writeBinary(const char *filename) {
 
     TinkerFileHeader header;
     header.file_type = 0;
-    header.code_seg_begin = CODE_START_ADDR; // 0x2000
+    header.code_seg_begin = CSTART; // 0x2000
     header.code_seg_size = codeSize;
-    header.data_seg_begin = DATA_START_ADDR; // 0x10000
+    header.data_seg_begin = DSTART; // 0x10000
     header.data_seg_size = dataSize;
 
-    // Write header
+    // write header
     fwrite(&header, sizeof(header), 1, f);
 
+    // code segment after header (no padding)
     for (int i = 0; i < numInstructions; i++) {
         if (instructions[i].op[0] == '.')
             continue;
@@ -647,6 +659,7 @@ void writeBinary(const char *filename) {
             encodeInstruction(instructions[i], f);
     }
 
+    // data segment after code (no padding)
     for (int i = 0; i < numInstructions; i++) {
         if (instructions[i].op[0] == '.')
             continue;
@@ -658,7 +671,6 @@ void writeBinary(const char *filename) {
 }
 
 //  validation
-
 int hasError = 0;
 
 int isNegative(const char *str) { return str[0] == '-'; }
@@ -771,7 +783,7 @@ void validateFile(const char *filename) {
                 return;
             }
 
-            // space/tab immediately after colon is invalid (": L1")
+            // space immediately after colon invalid
             if (rawLine[i] == ' ' || rawLine[i] == '\t') {
                 fprintf(stderr,
                         "error line %d: invalid label (space after colon)\n",
@@ -781,7 +793,7 @@ void validateFile(const char *filename) {
                 return;
             }
 
-            // consume all non-whitespace characters
+            // consume all non-whitespace
             while (rawLine[i] != '\0' && rawLine[i] != '\n' &&
                    rawLine[i] != ' ' && rawLine[i] != '\t') {
                 i++;
@@ -791,7 +803,7 @@ void validateFile(const char *filename) {
             while (rawLine[i] == ' ' || rawLine[i] == '\t')
                 i++;
 
-            // if there's still non-whitespace content, label has internal space
+            // internal space
             if (rawLine[i] != '\n' && rawLine[i] != '\0') {
                 fprintf(
                     stderr,
@@ -821,7 +833,6 @@ void validateFile(const char *filename) {
 
             if (currentMode == 1) {
                 //  code section
-
                 // check parentheses balance and ordering
                 {
                     int openCount = 0;
@@ -1038,7 +1049,7 @@ void validateFile(const char *filename) {
                         } else if (tokens[1][0] == ':') {
                             // label form: validated later in second pass
                         } else {
-                            // literal form: must be 12-bit signed  –2048 … 2047
+                            // literal form: 12-bit signed
                             errno = 0;
                             char *end;
                             long long val = strtoll(tokens[1], &end, 0);
@@ -1104,8 +1115,7 @@ void validateFile(const char *filename) {
                             parseNumber(tokens[4]);
                     }
                 } else if (strcmp(opcode, "mov") == 0) {
-
-                    // Check raw content for leading '('
+                    // check raw content for leading '('
                     char *parenCheck = content;
                     while (*parenCheck == ' ' || *parenCheck == '\t')
                         parenCheck++;
@@ -1149,15 +1159,15 @@ void validateFile(const char *filename) {
                             validateRegister(tokens[3]);
                         }
                     } else {
-                        // dest is a register: mov rd, ...
+                        // dest is a register
                         if (argCount < 2) {
                             fprintf(stderr,
                                     "error: mov expects at least 2 args\n");
                             hasError = 1;
                         } else {
                             validateRegister(tokens[1]); // rd always a register
-                            // check for '(' check if source arg contains '('
-                            // look for '(' after the comma in content
+
+                            // find where the source starts in raw content to check ( and )
                             char *comma = strchr(content, ',');
                             int srcIsMem = 0;
                             if (comma) {
@@ -1168,7 +1178,6 @@ void validateFile(const char *filename) {
                             }
 
                             if (srcIsMem) {
-                                // mov rd, (rs)(L)
                                 if (argCount != 3) {
                                     fprintf(stderr,
                                             "error: mov rd,(rs)(L) expects 3 "
@@ -1214,7 +1223,7 @@ void validateFile(const char *filename) {
                                     // mov rd, rs
                                     validateRegister(tokens[2]);
                                 } else {
-                                    // mov rd, L — 12-bit unsigned (0-4095)
+                                    // mov rd, L — 12-bit unsigned
                                     if (tokens[2][0] != ':') {
                                         errno = 0;
                                         char *end;
@@ -1262,7 +1271,7 @@ void validateFile(const char *filename) {
 
                 errno = 0;
                 char *end;
-                /*unsigned long long val =*/strtoull(content, &end, 0);
+                strtoull(content, &end, 0);
 
                 while (*end == ' ' || *end == '\t')
                     end++;
